@@ -13,7 +13,7 @@ export function expectedFlightKey({
 }: ExpectedFlightKeyParams) {
   return formatFlightKey({
     airline: airline_code,
-    number: Number(flight_number),
+    number: "not-a-number",
     date: dep_time_utc.slice(0, 10),
   });
 }
