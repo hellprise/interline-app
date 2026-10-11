@@ -1,13 +1,8 @@
 {
   "name": "interline-app",
-  "version": "1.0.0",
-  "description": "",
   "scripts": {
     "typecheck": "pnpm -r run typecheck"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "private": true,
   "devEngines": {
     "packageManager": {

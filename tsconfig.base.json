@@ -1,8 +1,11 @@
 {
   "compilerOptions": {
     "module": "nodenext",
-    "target": "es2022",
     "strict": true,
     "types": [],
+    "erasableSyntaxOnly": true, // enums are prohibited
+    "verbatimModuleSyntax": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
   }
 }
