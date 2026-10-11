@@ -1,0 +1,27 @@
+{
+  "name": "interline-app",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "typecheck": "pnpm -r run typecheck"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "private": true,
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "12.11.2",
+      "onFail": "download"
+    }
+  },
+  "packageManager": "pnpm@12.11.2",
+  "type": "module",
+  "engines": {
+    "node": ">=26.0.0"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}
