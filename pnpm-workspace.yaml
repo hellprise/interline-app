@@ -3,3 +3,8 @@ packages:
 
 catalog:
  typescript: "6.0.x"
+ vitest: "5.0.0"
+
+minimumReleaseAgeExclude:
+  - "@typescript-eslint/parser@8.71.2"
+  - "@typescript-eslint/visitor-keys@8.71.2"

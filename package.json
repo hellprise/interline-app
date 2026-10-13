@@ -1,7 +1,10 @@
 {
   "name": "interline-app",
   "scripts": {
-    "typecheck": "pnpm -r run typecheck"
+    "typecheck": "pnpm -r run typecheck",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint ."
   },
   "private": true,
   "devEngines": {
@@ -17,6 +20,11 @@
     "node": ">=26.0.0"
   },
   "devDependencies": {
-    "typescript": "catalog:"
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.12.0",
+    "typescript": "catalog:",
+    "typescript-eslint": "^8.71.2",
+    "vite": "^8.0.0",
+    "vitest": "catalog:"
   }
 }
