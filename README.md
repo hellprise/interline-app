@@ -1,5 +1,7 @@
 # interline-app
 
+[![CI](https://github.com/hellprise/interline-app/actions/workflows/ci.yml/badge.svg)](https://github.com/hellprise/interline-app/actions/workflows/ci.yml)
+
 TypeScript monorepo for the Interline flight aggregator (web client and core services).
 
 ## Prerequisites
