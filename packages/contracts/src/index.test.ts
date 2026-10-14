@@ -9,7 +9,7 @@ describe("formatFlightKey", () => {
         number: 123,
         date: "2026-10-13",
       }),
-    ).toBe("BROKEN");
+    ).toBe("AA-123-2026-10-13");
   });
 
   it("returns the format with number in code", () => {
