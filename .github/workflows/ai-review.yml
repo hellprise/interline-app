@@ -8,19 +8,20 @@ permissions:
   contents: read
   pull-requests: write
 
-concurrency:
-  group: ai-review-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
-
 jobs:
   review:
     name: AI Code Review
     if: github.event.label.name == 'ai-review'
+    concurrency:
+      group: ai-review-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
@@ -38,6 +39,10 @@ jobs:
         run: |
           PROMPT=$(cat .github/ai-review/prompt.md)
           gh pr diff "$PR_NUMBER" > /tmp/pr.diff
+          if [ ! -s /tmp/pr.diff ]; then
+            echo "Empty diff, skipping AI review"
+            exit 0
+          fi
 
           claude -p "$PROMPT" \
             --bare \
@@ -47,8 +52,8 @@ jobs:
             --max-budget-usd 1 \
             --output-format json < /tmp/pr.diff > /tmp/review.json
 
-          REVIEW=$(jq -r '.result' /tmp/review.json)
-          COST=$(jq -r '.total_cost_usd' /tmp/review.json)
+          REVIEW=$(jq -er 'select(.is_error != true) | .result // empty' /tmp/review.json)
+          COST=$(jq -r '.total_cost_usd // "unknown"' /tmp/review.json)
 
           printf "%s\n\n---\n*Estimated AI review cost: \$%s USD*" "$REVIEW" "$COST" > /tmp/comment.md
-          gh pr comment "$PR_NUMBER" --body-file /tmp/comment.md
+          gh pr comment "$PR_NUMBER" --edit-last --create-if-none --body-file /tmp/comment.md
