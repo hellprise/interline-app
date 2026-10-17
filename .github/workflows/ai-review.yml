@@ -11,7 +11,7 @@ permissions:
 jobs:
   review:
     name: AI Code Review
-    if: github.event.label.name == 'ai-review'
+    if: github.event.label.name == 'ai-review' && github.event.pull_request.head.repo.full_name == github.repository
     concurrency:
       group: ai-review-${{ github.event.pull_request.number }}
       cancel-in-progress: true
@@ -39,6 +39,7 @@ jobs:
 
       - name: Run AI Review
         env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           if [ ! -s /tmp/pr.diff ]; then
@@ -49,6 +50,7 @@ jobs:
           PROMPT=$(cat .github/ai-review/prompt.md)
 
           claude -p "$PROMPT" \
+            --model sonnet \
             --bare \
             --setting-sources user \
             --tools "" \
@@ -56,10 +58,14 @@ jobs:
             --max-budget-usd 1 \
             --output-format json < /tmp/pr.diff > /tmp/review.json
 
-          REVIEW=$(jq -er 'select(.is_error != true) | .result | select(type == "string" and length > 0)' /tmp/review.json)
+          if ! REVIEW=$(jq -er 'select(.is_error != true) | .result | select(type == "string" and length > 0)' /tmp/review.json); then
+            echo "::error::AI review failed: $(jq -c '{subtype, is_error, total_cost_usd, errors}' /tmp/review.json)"
+            exit 1
+          fi
           COST=$(jq -r '.total_cost_usd // "unknown"' /tmp/review.json)
+          MODEL=$(jq -r '.modelUsage | keys[0] // "unknown"' /tmp/review.json)
 
-          printf "%s\n\n---\n*Estimated AI review cost: \$%s USD*" "$REVIEW" "$COST" > /tmp/comment.md
+          printf "%s\n\n---\n*AI review · model: \`%s\` · commit: \`%s\` · cost: \$%s USD*" "$REVIEW" "$MODEL" "${HEAD_SHA:0:7}" "$COST" > /tmp/comment.md
 
       - name: Post PR comment
         env:
