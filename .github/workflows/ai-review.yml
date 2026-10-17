@@ -49,6 +49,7 @@ jobs:
 
           PROMPT=$(cat .github/ai-review/prompt.md)
 
+          CLAUDE_EXIT=0
           claude -p "$PROMPT" \
             --model sonnet \
             --bare \
@@ -56,14 +57,14 @@ jobs:
             --tools "" \
             --permission-mode dontAsk \
             --max-budget-usd 1 \
-            --output-format json < /tmp/pr.diff > /tmp/review.json
+            --output-format json < /tmp/pr.diff > /tmp/review.json || CLAUDE_EXIT=$?
 
-          if ! REVIEW=$(jq -er 'select(.is_error != true) | .result | select(type == "string" and length > 0)' /tmp/review.json); then
-            echo "::error::AI review failed: $(jq -c '{subtype, is_error, total_cost_usd, errors}' /tmp/review.json)"
+          if [ "$CLAUDE_EXIT" -ne 0 ] || ! REVIEW=$(jq -er 'select(.is_error != true) | .result | select(type == "string" and length > 0)' /tmp/review.json); then
+            echo "::error::AI review failed (exit $CLAUDE_EXIT): $(jq -c '{subtype, terminal_reason, is_error, total_cost_usd, errors, result}' /tmp/review.json)"
             exit 1
           fi
           COST=$(jq -r '.total_cost_usd // "unknown"' /tmp/review.json)
-          MODEL=$(jq -r '.modelUsage | keys[0] // "unknown"' /tmp/review.json)
+          MODEL=$(jq -r '(.modelUsage // {}) | keys[0] // "unknown"' /tmp/review.json)
 
           printf "%s\n\n---\n*AI review · model: \`%s\` · commit: \`%s\` · cost: \$%s USD*" "$REVIEW" "$MODEL" "${HEAD_SHA:0:7}" "$COST" > /tmp/comment.md
 
