@@ -31,18 +31,22 @@ jobs:
       - name: Install Claude Code CLI
         run: npm install -g @anthropic-ai/claude-code@2.1.301
 
-      - name: Run AI Review and comment on PR
+      - name: Get PR diff
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: gh pr diff "$PR_NUMBER" > /tmp/pr.diff
+
+      - name: Run AI Review
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          PROMPT=$(cat .github/ai-review/prompt.md)
-          gh pr diff "$PR_NUMBER" > /tmp/pr.diff
           if [ ! -s /tmp/pr.diff ]; then
             echo "Empty diff, skipping AI review"
             exit 0
           fi
+
+          PROMPT=$(cat .github/ai-review/prompt.md)
 
           claude -p "$PROMPT" \
             --bare \
@@ -52,8 +56,16 @@ jobs:
             --max-budget-usd 1 \
             --output-format json < /tmp/pr.diff > /tmp/review.json
 
-          REVIEW=$(jq -er 'select(.is_error != true) | .result // empty' /tmp/review.json)
+          REVIEW=$(jq -er 'select(.is_error != true) | .result | select(type == "string" and length > 0)' /tmp/review.json)
           COST=$(jq -r '.total_cost_usd // "unknown"' /tmp/review.json)
 
           printf "%s\n\n---\n*Estimated AI review cost: \$%s USD*" "$REVIEW" "$COST" > /tmp/comment.md
-          gh pr comment "$PR_NUMBER" --edit-last --create-if-none --body-file /tmp/comment.md
+
+      - name: Post PR comment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          if [ -s /tmp/comment.md ]; then
+            gh pr comment "$PR_NUMBER" --edit-last --create-if-none --body-file /tmp/comment.md
+          fi
