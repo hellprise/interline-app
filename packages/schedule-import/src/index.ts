@@ -1,4 +1,4 @@
-import { formatFlightKey } from "@interline/contracts";
+import { formatFlightKey, type FlightKey } from "@interline/contracts";
 
 interface ExpectedFlightKeyParams {
   airline_code: string;
@@ -10,7 +10,7 @@ export function expectedFlightKey({
   airline_code,
   dep_time_utc,
   flight_number,
-}: ExpectedFlightKeyParams) {
+}: ExpectedFlightKeyParams): FlightKey {
   return formatFlightKey({
     airline: airline_code,
     number: Number(flight_number),
