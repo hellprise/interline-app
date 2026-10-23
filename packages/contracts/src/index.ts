@@ -30,17 +30,21 @@ export function formatFlightKey(params: FormatFlightKeyParams): FlightKey {
 function validateFlightKey({ airline, number, date }: FormatFlightKeyParams) {
   if (!isValidAirline(airline)) {
     throw new RangeError(
-      "Airline should be two uppercase symbols string with letter and number",
+      `Invalid airline code: expected 2 uppercase alphanumeric characters A-Z and 0-9, got: "${airline}"`,
     );
   }
 
   if (!Number.isInteger(number) || number <= 0 || number > 9999) {
-    throw new RangeError("Number should be more than 0 and less than 9999");
+    throw new RangeError(
+      `Invalid flight number: expected an integer between 1 and 9999, got "${number}"`,
+    );
   }
 
   const isValid = isValidDate(date);
   if (!isValid) {
-    throw new RangeError("Date should be correct and in UTC format");
+    throw new RangeError(
+      `Invalid flight date: expected a valid YYYY-MM-DD calendar date, got "${date}"`,
+    );
   }
 }
 
