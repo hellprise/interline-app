@@ -10,8 +10,8 @@ export class FlightsController {
   }
 
   @Get("/:key")
-  findByKey(@Param() params: { key: string }) {
-    const res = this.flightService.findByKey(params.key);
+  findByKey(@Param("key") key: string) {
+    const res = this.flightService.findByKey(key);
 
     if (!res.ok) throw new BadRequestException({ error: res.error });
 
