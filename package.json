@@ -4,7 +4,8 @@
     "typecheck": "pnpm -r run typecheck",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "build": "pnpm -r run build"
   },
   "private": true,
   "devEngines": {

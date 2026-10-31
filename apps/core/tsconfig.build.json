@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "noEmit": false,
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "rewriteRelativeImportExtensions": true
+  },
+  "exclude": [
+    "src/**/*.test.ts"
+  ],
+  "extends": "./tsconfig.json"
+}
