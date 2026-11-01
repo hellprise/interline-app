@@ -1,5 +1,9 @@
-import { BadRequestException, Controller, Get, Param } from "@nestjs/common";
+import { Controller, Get, Param } from "@nestjs/common";
 import { FlightsService } from "./flights.service.ts";
+import {
+  ParseFlightKeyPipe,
+  type ParsedFlightKey,
+} from "./parse-flight-key.pipe.ts";
 
 @Controller("flights")
 export class FlightsController {
@@ -10,16 +14,7 @@ export class FlightsController {
   }
 
   @Get("/:key")
-  findByKey(@Param("key") key: string) {
-    const res = this.flightService.findByKey(key);
-
-    if (!res.ok) throw new BadRequestException({ error: res.error });
-
-    return {
-      key: res.key,
-      airline: res.airline,
-      number: res.number,
-      date: res.date,
-    };
+  findByKey(@Param("key", ParseFlightKeyPipe) parsed: ParsedFlightKey) {
+    return this.flightService.findByKey(parsed);
   }
 }
