@@ -31,26 +31,26 @@ export class ProblemDetailsFilter implements ExceptionFilter {
 
     if (exception instanceof HttpException) {
       const status = exception.getStatus();
-      res
-        .status(status)
-        .type("application/problem+json")
-        .json({
-          type: "about:blank",
-          title: STATUS_CODES[status] ?? "Error",
-          status,
-          detail: exception.message,
-          instance: req.originalUrl,
-        });
-      return;
+      if (status < 500) {
+        res
+          .status(status)
+          .type("application/problem+json")
+          .json({
+            type: "about:blank",
+            title: STATUS_CODES[status] ?? "Error",
+            status,
+            detail: exception.message,
+            instance: req.originalUrl,
+          });
+        return;
+      }
     }
 
+    const err =
+      exception instanceof Error ? exception : new Error(String(exception));
+
+    this.logger.error(err.message, err.stack);
     res.status(500).type("application/problem+json").json({
-      type: "about:blank",
-      title: "Internal Server Error",
-      status: 500,
-      instance: req.originalUrl,
-    });
-    this.logger.error(exception, {
       type: "about:blank",
       title: "Internal Server Error",
       status: 500,
