@@ -51,6 +51,12 @@ export class ProblemDetailsFilter implements ExceptionFilter {
 
     this.logger.error(exception);
 
+    // If the headers have already been sent, we cannot modify the response, so we destroy it to prevent further issues.
+    if (res.headersSent) {
+      res.destroy();
+      return;
+    }
+
     res
       .status(status)
       .type("application/problem+json")
