@@ -1,20 +1,36 @@
-// Acceptance tests for the Nest lesson 2 project stage (errors as RFC 9457 Problem Details) — apps/core.
+// Acceptance tests for the Nest lesson 3 project stage (validated config, graceful shutdown,
+// 5xx errors that keep their status and hide their text) — apps/core.
 // Copy this file over apps/core/src/acceptance.test.ts and do not edit it.
 // `pnpm test` runs it; `pnpm typecheck` checks the expectTypeOf lines (tsc checks them, not Vitest).
 // The HTTP part uses supertest, which listens on a random local port.
 import "reflect-metadata";
 import { inspect } from "node:util";
 import type { ParseFlightKeyResult } from "@interline/contracts";
-import { Controller, Get, HttpException, Logger, type PipeTransform } from "@nestjs/common";
+import {
+  Controller,
+  Get,
+  HttpException,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  Module,
+  Res,
+  ServiceUnavailableException,
+  type PipeTransform,
+} from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import type { Response } from "express";
 import type { NestExpressApplication } from "@nestjs/platform-express";
 import { Test } from "@nestjs/testing";
 import request from "supertest";
 import { afterAll, afterEach, beforeAll, describe, expect, expectTypeOf, it, vi } from "vitest";
 import { AppModule } from "./app.module.ts";
+import { EnvSchema } from "./config/env.schema.ts";
 import { FlightsController } from "./flights/flights.controller.ts";
 import { FlightsService } from "./flights/flights.service.ts";
 import { InvalidFlightKeyError } from "./flights/invalid-flight-key.error.ts";
 import { ParseFlightKeyPipe } from "./flights/parse-flight-key.pipe.ts";
+import { ShutdownLogger } from "./shutdown-logger.service.ts";
 
 // Calls fn and returns what it threw; fails the test if nothing was thrown.
 function thrownBy(fn: () => unknown): unknown {
@@ -33,6 +49,39 @@ class BoomController {
   explode(): never {
     throw new Error("db password is hunter2");
   }
+
+  @Get("unavailable")
+  unavailable(): never {
+    throw new ServiceUnavailableException("redis at 10.0.0.7:6379 is down");
+  }
+
+  @Get("cause")
+  withCause(): never {
+    throw new InternalServerErrorException("db failed", { cause: new Error("inner: db down") });
+  }
+
+  @Get("object")
+  thrownObject(): never {
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- a library can throw anything
+    throw { code: "E_BOOM" };
+  }
+
+  @Get("partial")
+  partial(@Res() res: Response): never {
+    res.write("first chunk"); // the response has started: the filter cannot answer any more
+    throw new Error("failed after the first chunk");
+  }
+}
+
+// What the filter sent to Nest's Logger, as one string.
+function spyOnErrorLog(): () => string {
+  const onInstance = vi.spyOn(Logger.prototype, "error").mockImplementation(() => undefined);
+  const onStatic = vi.spyOn(Logger, "error").mockImplementation(() => undefined);
+  return () =>
+    [...onInstance.mock.calls, ...onStatic.mock.calls]
+      .flat()
+      .map((arg) => (typeof arg === "string" ? arg : inspect(arg)))
+      .join("\n");
 }
 
 describe("dependency injection metadata (no HTTP)", () => {
@@ -205,14 +254,119 @@ describe("unexpected errors", () => {
 
   it("the unexpected error is logged with its stack through Nest's Logger", async () => {
     // Either style counts: new Logger(...).error(...) or the static Logger.error(...).
-    const onInstance = vi.spyOn(Logger.prototype, "error").mockImplementation(() => undefined);
-    const onStatic = vi.spyOn(Logger, "error").mockImplementation(() => undefined);
+    const logged = spyOnErrorLog();
     await request(app.getHttpServer()).get("/boom");
-    const logged = [...onInstance.mock.calls, ...onStatic.mock.calls]
-      .flat()
-      .map((arg) => (typeof arg === "string" ? arg : inspect(arg)))
-      .join("\n");
-    expect(logged).toContain("db password is hunter2");
-    expect(logged).toContain("acceptance.test.ts"); // a stack frame of BoomController.explode, not only the message
+    expect(logged()).toContain("db password is hunter2");
+    expect(logged()).toContain("acceptance.test.ts"); // a stack frame of BoomController.explode, not only the message
+  });
+
+  it("a 5xx HttpException keeps its status and hides its text", async () => {
+    vi.spyOn(Logger.prototype, "error").mockImplementation(() => undefined);
+    vi.spyOn(Logger, "error").mockImplementation(() => undefined);
+    const res = await request(app.getHttpServer()).get("/boom/unavailable");
+    expect(res.status).toBe(503);
+    expect(res.headers["content-type"]).toMatch(/^application\/problem\+json/);
+    expect(res.text).not.toContain("10.0.0.7");
+    expect(res.body).toEqual({
+      type: "about:blank",
+      title: "Service Unavailable",
+      status: 503,
+      instance: "/boom/unavailable",
+    });
+  });
+
+  it("a 5xx HttpException reaches the log", async () => {
+    const logged = spyOnErrorLog();
+    await request(app.getHttpServer()).get("/boom/unavailable");
+    expect(logged()).toContain("redis at 10.0.0.7:6379 is down");
+  });
+
+  it("the cause of an error reaches the log, not the client", async () => {
+    const logged = spyOnErrorLog();
+    const res = await request(app.getHttpServer()).get("/boom/cause");
+    expect(res.status).toBe(500);
+    expect(res.text).not.toContain("db failed");
+    expect(res.text).not.toContain("inner: db down");
+    expect(logged()).toContain("inner: db down");
+  });
+
+  it("a thrown non-Error reaches the log with its fields", async () => {
+    const logged = spyOnErrorLog();
+    const res = await request(app.getHttpServer()).get("/boom/object");
+    expect(res.status).toBe(500);
+    expect(res.text).not.toContain("E_BOOM");
+    expect(logged()).toContain("E_BOOM");
+  });
+
+  it("the error is logged even when the response has already started", async () => {
+    const logged = spyOnErrorLog();
+    await request(app.getHttpServer())
+      .get("/boom/partial")
+      .catch(() => undefined); // the connection is cut: that is expected
+    expect(logged()).toContain("failed after the first chunk");
+  });
+});
+
+describe("environment schema (no HTTP)", () => {
+  it("fills in the defaults: PORT is the number 3000, NODE_ENV is development", () => {
+    expect(EnvSchema.parse({})).toMatchObject({ PORT: 3000, NODE_ENV: "development" });
+  });
+
+  it("turns the PORT string into a number", () => {
+    expect(EnvSchema.parse({ PORT: "8080" })).toMatchObject({ PORT: 8080 });
+  });
+
+  it.each(["abc", "", "0", "70000", "1.5"])("rejects PORT=%j", (port) => {
+    expect(EnvSchema.safeParse({ PORT: port }).success).toBe(false);
+  });
+
+  it("rejects an unknown NODE_ENV", () => {
+    expect(EnvSchema.safeParse({ NODE_ENV: "prod" }).success).toBe(false);
+  });
+});
+
+describe("configuration in the app", () => {
+  // Imports nothing: it sees ConfigService only if ConfigModule is global.
+  @Injectable()
+  class NeedsConfig {
+    readonly config: ConfigService;
+
+    constructor(config: ConfigService) {
+      this.config = config;
+    }
+  }
+
+  @Module({ providers: [NeedsConfig] })
+  class FeatureModule {}
+
+  it("ConfigService is visible in a module that does not import ConfigModule", async () => {
+    const moduleRef = await Test.createTestingModule({ imports: [AppModule, FeatureModule] }).compile();
+    expect(moduleRef.get(NeedsConfig, { strict: false }).config).toBeInstanceOf(ConfigService);
+    await moduleRef.close();
+  });
+
+  it("PORT from ConfigService is a number, not the string from the environment", async () => {
+    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    expect(typeof moduleRef.get(ConfigService, { strict: false }).get<unknown>("PORT")).toBe("number");
+    await moduleRef.close();
+  });
+});
+
+describe("graceful shutdown", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("ShutdownLogger is registered and logs when the app closes", async () => {
+    // Either style counts: new Logger(...).log(...) or the static Logger.log(...).
+    const onLog = vi.spyOn(Logger.prototype, "log").mockImplementation(() => undefined);
+    const onStaticLog = vi.spyOn(Logger, "log").mockImplementation(() => undefined);
+    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    expect(moduleRef.get(ShutdownLogger, { strict: false })).toBeInstanceOf(ShutdownLogger);
+    const app = moduleRef.createNestApplication<NestExpressApplication>();
+    await app.init();
+    await app.close();
+    const logged = [...onLog.mock.calls, ...onStaticLog.mock.calls].flat().map(String).join("\n");
+    expect(logged).toContain("Shutting down");
   });
 });
