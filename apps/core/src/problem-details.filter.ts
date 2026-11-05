@@ -46,15 +46,18 @@ export class ProblemDetailsFilter implements ExceptionFilter {
       }
     }
 
-    const err =
-      exception instanceof Error ? exception : new Error(String(exception));
+    const status =
+      exception instanceof HttpException ? exception.getStatus() : 500;
 
-    this.logger.error(err.message, err.stack);
-    res.status(500).type("application/problem+json").json({
-      type: "about:blank",
-      title: "Internal Server Error",
-      status: 500,
-      instance: req.originalUrl,
-    });
+    this.logger.error(exception);
+    res
+      .status(status)
+      .type("application/problem+json")
+      .json({
+        type: "about:blank",
+        title: STATUS_CODES[status] ?? "Internal Server Error",
+        status: status,
+        instance: req.originalUrl,
+      });
   }
 }
