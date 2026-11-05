@@ -1,7 +1,7 @@
 import type { NestExpressApplication } from "@nestjs/platform-express";
 import { Test } from "@nestjs/testing";
 import request from "supertest";
-import { afterAll, beforeAll, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, expect, it, vi } from "vitest";
 import { AppModule } from "../app.module.ts";
 import { FlightsService } from "./flights.service.ts";
 import { Logger } from "@nestjs/common";
@@ -24,7 +24,7 @@ beforeAll(async () => {
 
 afterAll(async () => await app.close());
 
-it("catch the error", async () => {
+it("a failure in FlightService is a 500 problem without its message", async () => {
   vi.spyOn(Logger.prototype, "error").mockImplementation(() => undefined);
   const res = await request(app.getHttpServer()).get(
     "/flights/Q7-123-2026-11-05",
@@ -32,3 +32,5 @@ it("catch the error", async () => {
   expect(res.status).toBe(500);
   expect(res.text).not.toContain("db is down");
 });
+
+afterEach(() => vi.restoreAllMocks());

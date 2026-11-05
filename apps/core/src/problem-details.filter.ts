@@ -50,6 +50,7 @@ export class ProblemDetailsFilter implements ExceptionFilter {
       exception instanceof HttpException ? exception.getStatus() : 500;
 
     this.logger.error(exception);
+
     res
       .status(status)
       .type("application/problem+json")
