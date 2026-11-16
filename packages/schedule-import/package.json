@@ -4,9 +4,14 @@
   "type": "module",
   "exports": "./src/index.ts",
   "dependencies": {
-    "@interline/contracts": "workspace:*"
+    "@interline/contracts": "workspace:*",
+    "csv-parse": "^7.0.3",
+    "zod": "^4.6.7"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6"
   }
 }
