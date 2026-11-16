@@ -1,19 +1,12 @@
-import { formatFlightKey, type FlightKey } from "@interline/contracts";
-
-interface ExpectedFlightKeyParams {
-  airline_code: string;
-  flight_number: string;
-  dep_time_utc: string;
-}
-
-export function expectedFlightKey({
-  airline_code,
-  dep_time_utc,
-  flight_number,
-}: ExpectedFlightKeyParams): FlightKey {
-  return formatFlightKey({
-    airline: airline_code,
-    number: Number(flight_number),
-    date: dep_time_utc.slice(0, 10),
-  });
-}
+export { expectedFlightKey } from "./flight-key.ts";
+export {
+  SCHEDULE_COLUMNS,
+  ScheduleRowSchema,
+  type ScheduleRow,
+} from "./row-schema.ts";
+export {
+  importSchedule,
+  type ImportOptions,
+  type ImportResult,
+  type RowError,
+} from "./import-schedule.ts";
