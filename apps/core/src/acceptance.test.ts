@@ -1,5 +1,7 @@
 // Acceptance tests for the Nest lesson 3 project stage (validated config, graceful shutdown,
 // 5xx errors that keep their status and hide their text) — apps/core.
+// Prisma lesson 1 version: FlightsService reads the database now, so the HTTP contract part
+// replaces it with an echo stub, and every env example carries a DATABASE_URL.
 // Copy this file over apps/core/src/acceptance.test.ts and do not edit it.
 // `pnpm test` runs it; `pnpm typecheck` checks the expectTypeOf lines (tsc checks them, not Vitest).
 // The HTTP part uses supertest, which listens on a random local port.
@@ -123,11 +125,18 @@ describe("ParseFlightKeyPipe and InvalidFlightKeyError (no HTTP)", () => {
   });
 });
 
+// The HTTP contract of lesson 2 without a database: the service echoes the parsed key.
+// What the real service reads from Postgres is checked in db.acceptance.test.ts.
+const echoFlights = { findByKey: (parsed: unknown) => Promise.resolve(parsed) };
+
 describe("HTTP contract", () => {
   let app: NestExpressApplication;
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(FlightsService)
+      .useValue(echoFlights)
+      .compile();
     app = moduleRef.createNestApplication<NestExpressApplication>();
     await app.init();
   });
@@ -308,20 +317,36 @@ describe("unexpected errors", () => {
 });
 
 describe("environment schema (no HTTP)", () => {
+  // Every example carries a valid DATABASE_URL: a case must fail because of the field it is about.
+  const DATABASE_URL = "postgresql://user:password@localhost:5432/interline_core";
+
   it("fills in the defaults: PORT is the number 3000, NODE_ENV is development", () => {
-    expect(EnvSchema.parse({})).toMatchObject({ PORT: 3000, NODE_ENV: "development" });
+    expect(EnvSchema.parse({ DATABASE_URL })).toMatchObject({ PORT: 3000, NODE_ENV: "development" });
   });
 
   it("turns the PORT string into a number", () => {
-    expect(EnvSchema.parse({ PORT: "8080" })).toMatchObject({ PORT: 8080 });
+    expect(EnvSchema.parse({ PORT: "8080", DATABASE_URL })).toMatchObject({ PORT: 8080 });
   });
 
   it.each(["abc", "", "0", "70000", "1.5"])("rejects PORT=%j", (port) => {
-    expect(EnvSchema.safeParse({ PORT: port }).success).toBe(false);
+    expect(EnvSchema.safeParse({ PORT: port, DATABASE_URL }).success).toBe(false);
   });
 
   it("rejects an unknown NODE_ENV", () => {
-    expect(EnvSchema.safeParse({ NODE_ENV: "prod" }).success).toBe(false);
+    expect(EnvSchema.safeParse({ NODE_ENV: "prod", DATABASE_URL }).success).toBe(false);
+  });
+
+  it.each([
+    ["missing", {}],
+    ["not a URL", { DATABASE_URL: "localhost:5432" }],
+    ["a URL of another database", { DATABASE_URL: "mysql://user:password@localhost:3306/interline_core" }],
+  ])("rejects DATABASE_URL: %s", (_case, env) => {
+    expect(EnvSchema.safeParse(env).success).toBe(false);
+  });
+
+  it("accepts both Postgres URL schemes: postgres:// and postgresql://", () => {
+    expect(EnvSchema.safeParse({ DATABASE_URL: "postgres://user:password@localhost:5432/interline_core" }).success).toBe(true);
+    expect(EnvSchema.safeParse({ DATABASE_URL }).success).toBe(true);
   });
 });
 

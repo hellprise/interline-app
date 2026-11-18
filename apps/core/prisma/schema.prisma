@@ -1,0 +1,45 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Airline {
+  code String @id
+  name String
+
+  flights Flight[]
+
+  @@map("airlines")
+}
+
+model Airport {
+  iata    String @id
+  name    String
+  country String
+
+  departures Flight[] @relation("departures")
+  arrivals   Flight[] @relation("arrivals")
+
+  @@map("airports")
+}
+
+model Flight {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique @map("flight_key")
+  airlineCode String   @map("airline_code")
+  number      Int      @map("flight_number")
+  depAirport  String   @map("dep_airport")
+  arrAirport  String   @map("arr_airport")
+  depTimeUtc  DateTime @map("dep_time_utc") @db.Timestamptz
+  arrTimeUtc  DateTime @map("arr_time_utc") @db.Timestamptz
+
+  airline     Airline @relation(fields: [airlineCode], references: [code])
+  origin      Airport @relation("departures", fields: [depAirport], references: [iata])
+  destination Airport @relation("arrivals", fields: [arrAirport], references: [iata])
+
+  @@map("flights")
+}

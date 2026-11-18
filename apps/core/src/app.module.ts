@@ -6,11 +6,15 @@ import { ShutdownLogger } from "./shutdown-logger.service.ts";
 import { FlightsModule } from "./flights/flights.module.ts";
 import { HealthController } from "./health.controller.ts";
 import { EnvSchema } from "./config/env.schema.ts";
+import { AppConfigModule } from "./config/app-config.module.ts";
+import { PrismaModule } from "./prisma/prisma.module.ts";
 
 @Module({
   controllers: [HealthController],
   imports: [
     ConfigModule.forRoot({ isGlobal: true, validationSchema: EnvSchema }),
+    AppConfigModule,
+    PrismaModule,
     FlightsModule,
   ],
   providers: [
