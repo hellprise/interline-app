@@ -1,5 +1,5 @@
-import { Controller, Get, Param } from "@nestjs/common";
-import { FlightsService } from "./flights.service.ts";
+import { Controller, Get, NotFoundException, Param } from "@nestjs/common";
+import { FlightsService, type FlightView } from "./flights.service.ts";
 import {
   ParseFlightKeyPipe,
   type ParsedFlightKey,
@@ -14,7 +14,14 @@ export class FlightsController {
   }
 
   @Get("/:key")
-  findByKey(@Param("key", ParseFlightKeyPipe) parsed: ParsedFlightKey) {
-    return this.flightService.findByKey(parsed);
+  async findByKey(
+    @Param("key", ParseFlightKeyPipe) parsed: ParsedFlightKey,
+  ): Promise<FlightView> {
+    const flight = await this.flightService.findByKey(parsed);
+
+    if (flight === null)
+      throw new NotFoundException(`Flight ${parsed.key} not found`);
+
+    return flight;
   }
 }
