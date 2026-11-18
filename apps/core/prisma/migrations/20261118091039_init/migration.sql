@@ -34,5 +34,6 @@ ADD CONSTRAINT "flights_dep_airport_fkey" FOREIGN KEY ("dep_airport") REFERENCES
 -- AddForeignKey
 ALTER TABLE "flights"
 ADD CONSTRAINT "flights_arr_airport_fkey" FOREIGN KEY ("arr_airport") REFERENCES "airports"("iata") ON DELETE RESTRICT ON UPDATE CASCADE;
+-- Added by hand: Prisma cannot express a CHECK constraint in the schema.
 ALTER TABLE "flights"
-ADD CONSTRAINT "flights_arrival_after_departure" ChECK ("arr_time_utc" > "dep_time_utc")
+ADD CONSTRAINT "flights_arrival_after_departure" CHECK ("arr_time_utc" > "dep_time_utc");
