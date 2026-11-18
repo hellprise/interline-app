@@ -15,7 +15,7 @@ export class PrismaService extends PrismaClient implements OnModuleDestroy {
   }
 
   // Close the pool when the service stops.
-  // Otherwise, connections will remain active for about 10 seconds of downtime
+  // Otherwise, connections will remain active for about 10 seconds of idle time.
   async onModuleDestroy(): Promise<void> {
     await this.$disconnect();
   }
